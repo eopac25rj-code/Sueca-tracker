@@ -22,7 +22,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import java.util.ArrayDeque
 
 class FloatingTrackerService : Service() {
 
@@ -30,7 +29,6 @@ class FloatingTrackerService : Service() {
     private var floatingView: LinearLayout? = null
     private var params: WindowManager.LayoutParams? = null
 
-    // 10 cartas da Sueca por naipe (do topo para baixo)
     private val ranks = arrayOf("A", "7", "K", "J", "Q", "6", "5", "4", "3", "2")
     private val suitSymbols = arrayOf("♠", "♥", "♦", "♣")
     private val suitIconColors = intArrayOf(
@@ -40,9 +38,8 @@ class FloatingTrackerService : Service() {
         Color.WHITE
     )
 
-    // played[rankIndex][suitIndex] -> true se a carta já saiu (fica vermelha)
     private val played = Array(ranks.size) { BooleanArray(4) }
-    private val history = ArrayDeque<Pair<Int, Int>>()
+    private val history = mutableListOf<Pair<Int, Int>>()
 
     private val suitHeaderViews = arrayOfNulls<TextView>(4)
     private val cardButtons = Array(ranks.size) { arrayOfNulls<TextView>(4) }
@@ -113,22 +110,21 @@ class FloatingTrackerService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 24
-            y = 120
+            x = dp(12f)
+            y = dp(60f)
         }
         params = layoutParams
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = makeRoundedRect("#F2131822", 18f, "#2F3A4E")
-            setPadding(14, 12, 14, 12)
+            setPadding(dp(12f), dp(10f), dp(12f), dp(10f))
         }
 
-        // Cabeçalho arrastável
         val headerBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(2, 0, 2, 8)
+            setPadding(dp(2f), 0, dp(2f), dp(8f))
         }
 
         val titleTv = TextView(this).apply {
@@ -136,7 +132,7 @@ class FloatingTrackerService : Service() {
             setTextColor(Color.WHITE)
             textSize = 13f
             setTypeface(null, Typeface.BOLD)
-            setPadding(2, 0, 14, 0)
+            setPadding(dp(2f), 0, dp(14f), 0)
         }
         titleTextView = titleTv
         headerBar.addView(titleTv)
@@ -148,7 +144,7 @@ class FloatingTrackerService : Service() {
         headerBar.addView(minTv)
 
         val spacer = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(8, 1)
+            layoutParams = LinearLayout.LayoutParams(dp(8f), dp(1f))
         }
         headerBar.addView(spacer)
 
@@ -160,7 +156,6 @@ class FloatingTrackerService : Service() {
         attachDragListener(headerBar)
         root.addView(headerBar)
 
-        // Corpo rolável com contadores por naipe, grade de cartas e botões inferiores
         val scroll = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -174,11 +169,10 @@ class FloatingTrackerService : Service() {
             orientation = LinearLayout.VERTICAL
         }
 
-        // Linha de contagem restante de cada naipe
         val suitSummaryRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 2, 0, 8)
+            setPadding(0, dp(2f), 0, dp(8f))
         }
 
         for (s in 0 until 4) {
@@ -195,12 +189,11 @@ class FloatingTrackerService : Service() {
         }
         content.addView(suitSummaryRow)
 
-        // Grade 10x4 de cartas (verde = disponível, vermelho = jogada)
         for (r in ranks.indices) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 3, 0, 3)
+                setPadding(0, dp(3f), 0, dp(3f))
             }
 
             for (s in 0 until 4) {
@@ -214,8 +207,8 @@ class FloatingTrackerService : Service() {
                     setTypeface(null, Typeface.BOLD)
                     gravity = Gravity.CENTER
                     background = makeRoundedRect("#1E7E34", 8f, "#38A169")
-                    layoutParams = LinearLayout.LayoutParams(dp(54), dp(30)).apply {
-                        if (suitIdx < 3) rightMargin = dp(5)
+                    layoutParams = LinearLayout.LayoutParams(dp(54f), dp(30f)).apply {
+                        if (suitIdx < 3) rightMargin = dp(5f)
                     }
                     setOnClickListener {
                         toggleCard(rankIdx, suitIdx)
@@ -228,11 +221,10 @@ class FloatingTrackerService : Service() {
             content.addView(row)
         }
 
-        // Botões inferiores: DESFAZER e LIMPAR (40)
         val footerRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 10, 0, 0)
+            setPadding(0, dp(10f), 0, 0)
         }
 
         val undoBtn = Button(this).apply {
@@ -244,10 +236,10 @@ class FloatingTrackerService : Service() {
             minimumWidth = 0
             minHeight = 0
             minimumHeight = 0
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(12f), dp(8f), dp(12f), dp(8f))
             background = makeRoundedRect("#232B3B", 8f, "#3A465C")
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                rightMargin = dp(6)
+                rightMargin = dp(6f)
             }
             setOnClickListener {
                 undoLastMove()
@@ -264,7 +256,7 @@ class FloatingTrackerService : Service() {
             minimumWidth = 0
             minHeight = 0
             minimumHeight = 0
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(12f), dp(8f), dp(12f), dp(8f))
             background = makeRoundedRect("#1E8E3E", 8f, "#34D399")
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setOnClickListener {
@@ -294,7 +286,7 @@ class FloatingTrackerService : Service() {
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.CENTER
             background = makeRoundedRect(bgHex, 6f, null)
-            layoutParams = LinearLayout.LayoutParams(dp(26), dp(24))
+            layoutParams = LinearLayout.LayoutParams(dp(26f), dp(24f))
             setOnClickListener { onClick() }
         }
     }
@@ -302,16 +294,18 @@ class FloatingTrackerService : Service() {
     private fun toggleCard(rankIdx: Int, suitIdx: Int) {
         val nextState = !played[rankIdx][suitIdx]
         played[rankIdx][suitIdx] = nextState
+        val item = Pair(rankIdx, suitIdx)
         if (nextState) {
-            history.addLast(Pair(rankIdx, suitIdx))
+            history.add(item)
         } else {
-            history.remove(Pair(rankIdx, suitIdx))
+            history.remove(item)
         }
         refreshAllUi()
     }
 
     private fun undoLastMove() {
-        val last = history.pollLast() ?: return
+        if (history.isEmpty()) return
+        val last = history.removeAt(history.lastIndex)
         played[last.first][last.second] = false
         refreshAllUi()
     }
@@ -364,13 +358,9 @@ class FloatingTrackerService : Service() {
             setColor(Color.parseColor(fillHex))
             cornerRadius = dp(radiusDp).toFloat()
             if (strokeHex != null) {
-                setStroke(dp(1), Color.parseColor(strokeHex))
+                setStroke(dp(1f), Color.parseColor(strokeHex))
             }
         }
-    }
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
     }
 
     private fun dp(value: Float): Int {
