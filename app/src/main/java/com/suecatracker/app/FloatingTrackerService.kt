@@ -18,9 +18,11 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import java.util.ArrayDeque
 
 class FloatingTrackerService : Service() {
 
@@ -28,19 +30,25 @@ class FloatingTrackerService : Service() {
     private var floatingView: LinearLayout? = null
     private var params: WindowManager.LayoutParams? = null
 
-    private val suitCounts = intArrayOf(10, 10, 10, 10)
-    private val suitLabels = arrayOf("♠", "♥", "♦", "♣")
-    private val suitColors = intArrayOf(
+    // 10 cartas da Sueca por naipe (do topo para baixo)
+    private val ranks = arrayOf("A", "7", "K", "J", "Q", "6", "5", "4", "3", "2")
+    private val suitSymbols = arrayOf("♠", "♥", "♦", "♣")
+    private val suitIconColors = intArrayOf(
         Color.WHITE,
-        Color.parseColor("#FF5252"),
-        Color.parseColor("#FF5252"),
+        Color.parseColor("#FF6B6B"),
+        Color.parseColor("#FF6B6B"),
         Color.WHITE
     )
 
-    private var totalTextView: TextView? = null
-    private val suitCountViews = arrayOfNulls<TextView>(4)
-    private var bodyContainer: LinearLayout? = null
-    private var minimizeBtn: Button? = null
+    // played[rankIndex][suitIndex] -> true se a carta já saiu (fica vermelha)
+    private val played = Array(ranks.size) { BooleanArray(4) }
+    private val history = ArrayDeque<Pair<Int, Int>>()
+
+    private val suitHeaderViews = arrayOfNulls<TextView>(4)
+    private val cardButtons = Array(ranks.size) { arrayOfNulls<TextView>(4) }
+    private var titleTextView: TextView? = null
+    private var bodyScrollView: ScrollView? = null
+    private var minimizeBtn: TextView? = null
     private var isMinimized = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -50,6 +58,7 @@ class FloatingTrackerService : Service() {
         try {
             startAsForegroundSafe()
             createOverlayView()
+            refreshAllUi()
         } catch (e: Throwable) {
             Toast.makeText(
                 this,
@@ -94,6 +103,8 @@ class FloatingTrackerService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        val maxHeightPx = (resources.displayMetrics.heightPixels * 0.72f).toInt()
+
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -102,159 +113,268 @@ class FloatingTrackerService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 40
-            y = 180
+            x = 24
+            y = 120
         }
         params = layoutParams
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = makeRoundedBg("#E616181D", 24f, "#3A3F4B")
-            setPadding(20, 16, 20, 16)
+            background = makeRoundedRect("#F2131822", 18f, "#2F3A4E")
+            setPadding(14, 12, 14, 12)
         }
 
-        val header = LinearLayout(this).apply {
+        // Cabeçalho arrastável
+        val headerBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(2, 0, 2, 8)
         }
 
-        val totalTv = TextView(this).apply {
-            text = "Restam: 40"
-            setTextColor(Color.parseColor("#4ADE80"))
-            textSize = 14f
+        val titleTv = TextView(this).apply {
+            text = "Sueca • 40/40"
+            setTextColor(Color.WHITE)
+            textSize = 13f
             setTypeface(null, Typeface.BOLD)
-            setPadding(4, 0, 16, 0)
+            setPadding(2, 0, 14, 0)
         }
-        totalTextView = totalTv
-        header.addView(totalTv)
+        titleTextView = titleTv
+        headerBar.addView(titleTv)
 
-        val minBtn = createMiniButton("–") {
+        val minTv = createTopActionButton("–", "#283548", Color.WHITE) {
             toggleMinimize()
         }
-        minimizeBtn = minBtn
-        header.addView(minBtn)
+        minimizeBtn = minTv
+        headerBar.addView(minTv)
 
-        val closeBtn = createMiniButton("✕") {
+        val spacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(8, 1)
+        }
+        headerBar.addView(spacer)
+
+        val closeTv = createTopActionButton("✕", "#C93B2B", Color.WHITE) {
             stopSelf()
         }
-        closeBtn.setTextColor(Color.parseColor("#FF6B6B"))
-        header.addView(closeBtn)
+        headerBar.addView(closeTv)
 
-        attachDragListener(header)
-        root.addView(header)
+        attachDragListener(headerBar)
+        root.addView(headerBar)
 
-        val body = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 12, 0, 0)
+        // Corpo rolável com contadores por naipe, grade de cartas e botões inferiores
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                maxHeightPx
+            )
+            isVerticalScrollBarEnabled = false
         }
-        bodyContainer = body
+        bodyScrollView = scroll
 
-        for (i in 0 until 4) {
-            val idx = i
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Linha de contagem restante de cada naipe
+        val suitSummaryRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 2, 0, 8)
+        }
+
+        for (s in 0 until 4) {
+            val sTv = TextView(this).apply {
+                text = "${suitSymbols[s]} 10"
+                setTextColor(suitIconColors[s])
+                textSize = 11f
+                setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            suitHeaderViews[s] = sTv
+            suitSummaryRow.addView(sTv)
+        }
+        content.addView(suitSummaryRow)
+
+        // Grade 10x4 de cartas (verde = disponível, vermelho = jogada)
+        for (r in ranks.indices) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 6, 0, 6)
+                setPadding(0, 3, 0, 3)
             }
 
-            val suitTv = TextView(this).apply {
-                text = suitLabels[idx]
-                setTextColor(suitColors[idx])
-                textSize = 18f
-                setTypeface(null, Typeface.BOLD)
-                setWidth(48)
-            }
+            for (s in 0 until 4) {
+                val rankIdx = r
+                val suitIdx = s
 
-            val minusBtn = createMiniButton("-") {
-                if (suitCounts[idx] > 0) {
-                    suitCounts[idx]--
-                    refreshUi()
+                val cell = TextView(this).apply {
+                    text = "${ranks[rankIdx]}${suitSymbols[suitIdx]}"
+                    setTextColor(Color.WHITE)
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    gravity = Gravity.CENTER
+                    background = makeRoundedRect("#1E7E34", 8f, "#38A169")
+                    layoutParams = LinearLayout.LayoutParams(dp(54), dp(30)).apply {
+                        if (suitIdx < 3) rightMargin = dp(5)
+                    }
+                    setOnClickListener {
+                        toggleCard(rankIdx, suitIdx)
+                    }
                 }
+                cardButtons[rankIdx][suitIdx] = cell
+                row.addView(cell)
             }
 
-            val countTv = TextView(this).apply {
-                text = "10"
-                setTextColor(Color.WHITE)
-                textSize = 15f
-                setTypeface(null, Typeface.BOLD)
-                gravity = Gravity.CENTER
-                setWidth(56)
-            }
-            suitCountViews[idx] = countTv
-
-            val plusBtn = createMiniButton("+") {
-                if (suitCounts[idx] < 10) {
-                    suitCounts[idx]++
-                    refreshUi()
-                }
-            }
-
-            row.addView(suitTv)
-            row.addView(minusBtn)
-            row.addView(countTv)
-            row.addView(plusBtn)
-            body.addView(row)
+            content.addView(row)
         }
 
-        val resetBtn = Button(this).apply {
-            text = "Nova rodada (40)"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            background = makeRoundedBg("#2B303B", 14f, null)
-            setPadding(16, 8, 16, 8)
+        // Botões inferiores: DESFAZER e LIMPAR (40)
+        val footerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 10, 0, 0)
+        }
+
+        val undoBtn = Button(this).apply {
+            text = "DESFAZER"
+            textSize = 11f
+            setTextColor(Color.parseColor("#CBD5E1"))
+            setTypeface(null, Typeface.BOLD)
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = makeRoundedRect("#232B3B", 8f, "#3A465C")
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                rightMargin = dp(6)
+            }
             setOnClickListener {
-                for (i in 0 until 4) {
-                    suitCounts[i] = 10
-                }
-                refreshUi()
+                undoLastMove()
             }
         }
-        body.addView(resetBtn)
+        footerRow.addView(undoBtn)
 
-        root.addView(body)
+        val clearBtn = Button(this).apply {
+            text = "LIMPAR (40)"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = makeRoundedRect("#1E8E3E", 8f, "#34D399")
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener {
+                resetDeck()
+            }
+        }
+        footerRow.addView(clearBtn)
+
+        content.addView(footerRow)
+        scroll.addView(content)
+        root.addView(scroll)
+
         floatingView = root
         wm.addView(root, layoutParams)
     }
 
-    private fun makeRoundedBg(fillHex: String, radius: Float, strokeHex: String?): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(Color.parseColor(fillHex))
-            cornerRadius = radius
-            if (strokeHex != null) {
-                setStroke(2, Color.parseColor(strokeHex))
-            }
-        }
-    }
-
-    private fun createMiniButton(label: String, onClick: () -> Unit): Button {
-        return Button(this).apply {
+    private fun createTopActionButton(
+        label: String,
+        bgHex: String,
+        textColor: Int,
+        onClick: () -> Unit
+    ): TextView {
+        return TextView(this).apply {
             text = label
-            textSize = 14f
-            setTextColor(Color.WHITE)
+            textSize = 12f
+            setTextColor(textColor)
             setTypeface(null, Typeface.BOLD)
-            setMinWidth(0)
-            setMinimumWidth(0)
-            setMinHeight(0)
-            setMinimumHeight(0)
-            setPadding(18, 6, 18, 6)
-            background = makeRoundedBg("#262A34", 12f, null)
+            gravity = Gravity.CENTER
+            background = makeRoundedRect(bgHex, 6f, null)
+            layoutParams = LinearLayout.LayoutParams(dp(26), dp(24))
             setOnClickListener { onClick() }
         }
     }
 
+    private fun toggleCard(rankIdx: Int, suitIdx: Int) {
+        val nextState = !played[rankIdx][suitIdx]
+        played[rankIdx][suitIdx] = nextState
+        if (nextState) {
+            history.addLast(Pair(rankIdx, suitIdx))
+        } else {
+            history.remove(Pair(rankIdx, suitIdx))
+        }
+        refreshAllUi()
+    }
+
+    private fun undoLastMove() {
+        val last = history.pollLast() ?: return
+        played[last.first][last.second] = false
+        refreshAllUi()
+    }
+
+    private fun resetDeck() {
+        for (r in ranks.indices) {
+            for (s in 0 until 4) {
+                played[r][s] = false
+            }
+        }
+        history.clear()
+        refreshAllUi()
+    }
+
+    private fun refreshAllUi() {
+        var remainingTotal = 0
+        val suitRemaining = IntArray(4) { 10 }
+
+        for (r in ranks.indices) {
+            for (s in 0 until 4) {
+                val isPlayed = played[r][s]
+                val cell = cardButtons[r][s]
+                if (isPlayed) {
+                    suitRemaining[s]--
+                    cell?.background = makeRoundedRect("#B91C1C", 8f, "#F87171")
+                    cell?.alpha = 0.92f
+                } else {
+                    remainingTotal++
+                    cell?.background = makeRoundedRect("#1E7E34", 8f, "#38A169")
+                    cell?.alpha = 1.0f
+                }
+            }
+        }
+
+        for (s in 0 until 4) {
+            suitHeaderViews[s]?.text = "${suitSymbols[s]} ${suitRemaining[s]}"
+        }
+
+        titleTextView?.text = "Sueca • $remainingTotal/40"
+    }
+
     private fun toggleMinimize() {
         isMinimized = !isMinimized
-        bodyContainer?.visibility = if (isMinimized) View.GONE else View.VISIBLE
+        bodyScrollView?.visibility = if (isMinimized) View.GONE else View.VISIBLE
         minimizeBtn?.text = if (isMinimized) "+" else "–"
     }
 
-    private fun refreshUi() {
-        var total = 0
-        for (i in 0 until 4) {
-            suitCountViews[i]?.text = suitCounts[i].toString()
-            total += suitCounts[i]
+    private fun makeRoundedRect(fillHex: String, radiusDp: Float, strokeHex: String?): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(Color.parseColor(fillHex))
+            cornerRadius = dp(radiusDp).toFloat()
+            if (strokeHex != null) {
+                setStroke(dp(1), Color.parseColor(strokeHex))
+            }
         }
-        totalTextView?.text = "Restam: $total"
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
+    }
+
+    private fun dp(value: Float): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 
     private fun attachDragListener(target: View) {
