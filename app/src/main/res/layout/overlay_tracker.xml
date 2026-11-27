@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardRoot"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    app:cardBackgroundColor="#E6121212"
+    app:cardCornerRadius="14dp"
+    app:strokeColor="#33FFFFFF"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <!-- Barra superior arrastável e controles -->
+        <LinearLayout
+            android:id="@+id/dragHandle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:id="@+id/tvRemainingCards"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Faltam: 40/40"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvRemainingTrumps"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="Trunfo: 10"
+                android:textColor="#FFD54F"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnReset"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="RESET"
+                android:textColor="#90CAF9"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnMinimize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="—"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Corpo expansível: seletor de trunfo + grade das 40 cartas -->
+        <LinearLayout
+            android:id="@+id/bodyContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="Trunfo:"
+                    android:textColor="#CCCCCC"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/btnTrumpSpades"
+                    android:layout_width="34dp"
+                    android:layout_height="26dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:gravity="center"
+                    android:text="♠"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/btnTrumpHearts"
+                    android:layout_width="34dp"
+                    android:layout_height="26dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:gravity="center"
+                    android:text="♥"
+                    android:textColor="#FF6B6B"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/btnTrumpDiamonds"
+                    android:layout_width="34dp"
+                    android:layout_height="26dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:gravity="center"
+                    android:text="♦"
+                    android:textColor="#FF6B6B"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/btnTrumpClubs"
+                    android:layout_width="34dp"
+                    android:layout_height="26dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:gravity="center"
+                    android:text="♣"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <!-- Grade preenchida dinamicamente com as 40 cartas (verde = em jogo, vermelho = saiu) -->
+            <GridLayout
+                android:id="@+id/gridCards"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="10"
+                android:rowCount="4" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
