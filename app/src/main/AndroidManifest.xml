@@ -10,7 +10,7 @@
         android:allowBackup="true"
         android:label="Sueca Tracker"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.SuecaTracker">
 
         <activity
             android:name=".MainActivity"
