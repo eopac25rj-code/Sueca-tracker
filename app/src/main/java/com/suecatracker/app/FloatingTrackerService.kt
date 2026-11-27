@@ -9,7 +9,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -18,7 +18,6 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -44,7 +43,7 @@ class FloatingTrackerService : Service() {
     private val suitHeaderViews = arrayOfNulls<TextView>(4)
     private val cardButtons = Array(ranks.size) { arrayOfNulls<TextView>(4) }
     private var titleTextView: TextView? = null
-    private var bodyScrollView: ScrollView? = null
+    private var bodyContainer: LinearLayout? = null
     private var minimizeBtn: TextView? = null
     private var isMinimized = false
 
@@ -100,8 +99,6 @@ class FloatingTrackerService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val maxHeightPx = (resources.displayMetrics.heightPixels * 0.72f).toInt()
-
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -110,21 +107,21 @@ class FloatingTrackerService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dp(12f)
-            y = dp(60f)
+            x = 20
+            y = 100
         }
         params = layoutParams
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = makeRoundedRect("#F2131822", 18f, "#2F3A4E")
-            setPadding(dp(12f), dp(10f), dp(12f), dp(10f))
+            background = ColorDrawable(Color.parseColor("#F0131822"))
+            setPadding(16, 14, 16, 14)
         }
 
         val headerBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(2f), 0, dp(2f), dp(8f))
+            setPadding(0, 0, 0, 10)
         }
 
         val titleTv = TextView(this).apply {
@@ -132,54 +129,60 @@ class FloatingTrackerService : Service() {
             setTextColor(Color.WHITE)
             textSize = 13f
             setTypeface(null, Typeface.BOLD)
-            setPadding(dp(2f), 0, dp(14f), 0)
+            setPadding(0, 0, 18, 0)
         }
         titleTextView = titleTv
         headerBar.addView(titleTv)
 
-        val minTv = createTopActionButton("–", "#283548", Color.WHITE) {
-            toggleMinimize()
+        val minTv = TextView(this).apply {
+            text = "–"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            background = ColorDrawable(Color.parseColor("#283548"))
+            setPadding(18, 6, 18, 6)
+            setOnClickListener { toggleMinimize() }
         }
         minimizeBtn = minTv
         headerBar.addView(minTv)
 
-        val spacer = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(8f), dp(1f))
+        val gapView = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(12, 1)
         }
-        headerBar.addView(spacer)
+        headerBar.addView(gapView)
 
-        val closeTv = createTopActionButton("✕", "#C93B2B", Color.WHITE) {
-            stopSelf()
+        val closeTv = TextView(this).apply {
+            text = "✕"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            background = ColorDrawable(Color.parseColor("#C93B2B"))
+            setPadding(18, 6, 18, 6)
+            setOnClickListener { stopSelf() }
         }
         headerBar.addView(closeTv)
 
         attachDragListener(headerBar)
         root.addView(headerBar)
 
-        val scroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                maxHeightPx
-            )
-            isVerticalScrollBarEnabled = false
-        }
-        bodyScrollView = scroll
-
-        val content = LinearLayout(this).apply {
+        val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+        bodyContainer = body
 
         val suitSummaryRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(2f), 0, dp(8f))
+            setPadding(0, 0, 0, 10)
         }
 
         for (s in 0 until 4) {
             val sTv = TextView(this).apply {
                 text = "${suitSymbols[s]} 10"
                 setTextColor(suitIconColors[s])
-                textSize = 11f
+                textSize = 12f
                 setTypeface(null, Typeface.BOLD)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -187,13 +190,13 @@ class FloatingTrackerService : Service() {
             suitHeaderViews[s] = sTv
             suitSummaryRow.addView(sTv)
         }
-        content.addView(suitSummaryRow)
+        body.addView(suitSummaryRow)
 
         for (r in ranks.indices) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(3f), 0, dp(3f))
+                setPadding(0, 4, 0, 4)
             }
 
             for (s in 0 until 4) {
@@ -203,12 +206,12 @@ class FloatingTrackerService : Service() {
                 val cell = TextView(this).apply {
                     text = "${ranks[rankIdx]}${suitSymbols[suitIdx]}"
                     setTextColor(Color.WHITE)
-                    textSize = 12f
+                    textSize = 13f
                     setTypeface(null, Typeface.BOLD)
                     gravity = Gravity.CENTER
-                    background = makeRoundedRect("#1E7E34", 8f, "#38A169")
-                    layoutParams = LinearLayout.LayoutParams(dp(54f), dp(30f)).apply {
-                        if (suitIdx < 3) rightMargin = dp(5f)
+                    background = ColorDrawable(Color.parseColor("#1E7E34"))
+                    layoutParams = LinearLayout.LayoutParams(118, 64).apply {
+                        if (suitIdx < 3) rightMargin = 8
                     }
                     setOnClickListener {
                         toggleCard(rankIdx, suitIdx)
@@ -218,13 +221,13 @@ class FloatingTrackerService : Service() {
                 row.addView(cell)
             }
 
-            content.addView(row)
+            body.addView(row)
         }
 
         val footerRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10f), 0, 0)
+            setPadding(0, 12, 0, 0)
         }
 
         val undoBtn = Button(this).apply {
@@ -236,14 +239,12 @@ class FloatingTrackerService : Service() {
             minimumWidth = 0
             minHeight = 0
             minimumHeight = 0
-            setPadding(dp(12f), dp(8f), dp(12f), dp(8f))
-            background = makeRoundedRect("#232B3B", 8f, "#3A465C")
+            setPadding(16, 12, 16, 12)
+            background = ColorDrawable(Color.parseColor("#232B3B"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                rightMargin = dp(6f)
+                rightMargin = 8
             }
-            setOnClickListener {
-                undoLastMove()
-            }
+            setOnClickListener { undoLastMove() }
         }
         footerRow.addView(undoBtn)
 
@@ -256,39 +257,18 @@ class FloatingTrackerService : Service() {
             minimumWidth = 0
             minHeight = 0
             minimumHeight = 0
-            setPadding(dp(12f), dp(8f), dp(12f), dp(8f))
-            background = makeRoundedRect("#1E8E3E", 8f, "#34D399")
+            setPadding(16, 12, 16, 12)
+            background = ColorDrawable(Color.parseColor("#1E8E3E"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener {
-                resetDeck()
-            }
+            setOnClickListener { resetDeck() }
         }
         footerRow.addView(clearBtn)
 
-        content.addView(footerRow)
-        scroll.addView(content)
-        root.addView(scroll)
+        body.addView(footerRow)
+        root.addView(body)
 
         floatingView = root
         wm.addView(root, layoutParams)
-    }
-
-    private fun createTopActionButton(
-        label: String,
-        bgHex: String,
-        textColor: Int,
-        onClick: () -> Unit
-    ): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 12f
-            setTextColor(textColor)
-            setTypeface(null, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            background = makeRoundedRect(bgHex, 6f, null)
-            layoutParams = LinearLayout.LayoutParams(dp(26f), dp(24f))
-            setOnClickListener { onClick() }
-        }
     }
 
     private fun toggleCard(rankIdx: Int, suitIdx: Int) {
@@ -330,12 +310,10 @@ class FloatingTrackerService : Service() {
                 val cell = cardButtons[r][s]
                 if (isPlayed) {
                     suitRemaining[s]--
-                    cell?.background = makeRoundedRect("#B91C1C", 8f, "#F87171")
-                    cell?.alpha = 0.92f
+                    cell?.background = ColorDrawable(Color.parseColor("#B91C1C"))
                 } else {
                     remainingTotal++
-                    cell?.background = makeRoundedRect("#1E7E34", 8f, "#38A169")
-                    cell?.alpha = 1.0f
+                    cell?.background = ColorDrawable(Color.parseColor("#1E7E34"))
                 }
             }
         }
@@ -349,22 +327,8 @@ class FloatingTrackerService : Service() {
 
     private fun toggleMinimize() {
         isMinimized = !isMinimized
-        bodyScrollView?.visibility = if (isMinimized) View.GONE else View.VISIBLE
+        bodyContainer?.visibility = if (isMinimized) View.GONE else View.VISIBLE
         minimizeBtn?.text = if (isMinimized) "+" else "–"
-    }
-
-    private fun makeRoundedRect(fillHex: String, radiusDp: Float, strokeHex: String?): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(Color.parseColor(fillHex))
-            cornerRadius = dp(radiusDp).toFloat()
-            if (strokeHex != null) {
-                setStroke(dp(1f), Color.parseColor(strokeHex))
-            }
-        }
-    }
-
-    private fun dp(value: Float): Int {
-        return (value * resources.displayMetrics.density).toInt()
     }
 
     private fun attachDragListener(target: View) {
