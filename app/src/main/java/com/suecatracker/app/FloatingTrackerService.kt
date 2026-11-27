@@ -337,25 +337,26 @@ class FloatingTrackerService : Service() {
         var initialTouchX = 0f
         var initialTouchY = 0f
 
-        target.setOnTouchListener(View.OnTouchListener { _, event ->
-            val p = params ?: return@OnTouchListener false
-            when (event.action) {
+        target.setOnTouchListener { _, event ->
+            val ev = event ?: return@setOnTouchListener false
+            val p = params ?: return@setOnTouchListener false
+            when (ev.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = p.x
                     initialY = p.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
+                    initialTouchX = ev.rawX
+                    initialTouchY = ev.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    p.x = initialX + (event.rawX - initialTouchX).toInt()
-                    p.y = initialY + (event.rawY - initialTouchY).toInt()
+                    p.x = initialX + (ev.rawX - initialTouchX).toInt()
+                    p.y = initialY + (ev.rawY - initialTouchY).toInt()
                     windowManager?.updateViewLayout(floatingView, p)
                     true
                 }
                 else -> false
             }
-        })
+        }
     }
 
     override fun onDestroy() {
