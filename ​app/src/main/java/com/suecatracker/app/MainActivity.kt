@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -15,7 +17,7 @@ import com.suecatracker.app.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
+    private var binding: ActivityMainBinding? = null
     private var isOverlayRunning = false
 
     private val notificationPermissionLauncher =
@@ -25,34 +27,54 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        try {
+            val viewBinding = ActivityMainBinding.inflate(layoutInflater)
+            binding = viewBinding
+            setContentView(viewBinding.root)
 
-        binding.btnPermission.setOnClickListener {
-            requestOverlayPermission()
-        }
-
-        binding.btnToggleOverlay.setOnClickListener {
-            if (isOverlayRunning) {
-                stopOverlayService()
-            } else {
-                if (!Settings.canDrawOverlays(this)) {
-                    Toast.makeText(
-                        this,
-                        "Ative primeiro a permissão de sobreposição na tela.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    requestOverlayPermission()
-                    return@setOnClickListener
-                }
-                ensureNotificationPermissionAndStart()
+            viewBinding.btnPermission.setOnClickListener {
+                requestOverlayPermission()
             }
+
+            viewBinding.btnToggleOverlay.setOnClickListener {
+                if (isOverlayRunning) {
+                    stopOverlayService()
+                } else {
+                    if (!Settings.canDrawOverlays(this)) {
+                        Toast.makeText(
+                            this,
+                            "Ative primeiro a permissão de sobreposição na tela.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        requestOverlayPermission()
+                        return@setOnClickListener
+                    }
+                    ensureNotificationPermissionAndStart()
+                }
+            }
+        } catch (e: Throwable) {
+            showCrashDetails(e)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        updatePermissionUi()
+        try {
+            updatePermissionUi()
+        } catch (e: Throwable) {
+            showCrashDetails(e)
+        }
+    }
+
+    private fun showCrashDetails(e: Throwable) {
+        val scroll = ScrollView(this)
+        val tv = TextView(this).apply {
+            setPadding(32, 64, 32, 32)
+            textSize = 13f
+            text = "Erro ao abrir:\n\n${e.stackTraceToString()}"
+        }
+        scroll.addView(tv)
+        setContentView(scroll)
     }
 
     private fun requestOverlayPermission() {
@@ -78,10 +100,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startOverlayService() {
-        val intent = Intent(this, FloatingTrackerService::class.java)
-        ContextCompat.startForegroundService(this, intent)
-        isOverlayRunning = true
-        updateToggleButtonUi()
+        try {
+            val intent = Intent(this, FloatingTrackerService::class.java)
+            ContextCompat.startForegroundService(this, intent)
+            isOverlayRunning = true
+            updateToggleButtonUi()
+        } catch (e: Throwable) {
+            showCrashDetails(e)
+        }
     }
 
     private fun stopOverlayService() {
@@ -92,8 +118,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePermissionUi() {
+        val b = binding ?: return
         val hasPermission = Settings.canDrawOverlays(this)
-        binding.btnPermission.text = if (hasPermission) {
+        b.btnPermission.text = if (hasPermission) {
             "Sobreposição permitida ✓"
         } else {
             "Permitir sobreposição na tela"
@@ -102,7 +129,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateToggleButtonUi() {
-        binding.btnToggleOverlay.text = if (isOverlayRunning) {
+        val b = binding ?: return
+        b.btnToggleOverlay.text = if (isOverlayRunning) {
             "Parar contador flutuante"
         } else {
             "Iniciar contador flutuante"
