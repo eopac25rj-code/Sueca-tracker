@@ -6,11 +6,17 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -20,6 +26,22 @@ class FloatingTrackerService : Service() {
 
     private var windowManager: WindowManager? = null
     private var floatingView: LinearLayout? = null
+    private var params: WindowManager.LayoutParams? = null
+
+    private val suitCounts = intArrayOf(10, 10, 10, 10)
+    private val suitLabels = arrayOf("♠", "♥", "♦", "♣")
+    private val suitColors = intArrayOf(
+        Color.WHITE,
+        Color.parseColor("#FF5252"),
+        Color.parseColor("#FF5252"),
+        Color.WHITE
+    )
+
+    private var totalTextView: TextView? = null
+    private val suitCountViews = arrayOfNulls<TextView>(4)
+    private var bodyContainer: LinearLayout? = null
+    private var minimizeBtn: Button? = null
+    private var isMinimized = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -31,7 +53,7 @@ class FloatingTrackerService : Service() {
         } catch (e: Throwable) {
             Toast.makeText(
                 this,
-                "Erro no serviço: ${e.javaClass.simpleName}: ${e.message}",
+                "Erro no serviço: ${e.javaClass.simpleName}:${e.message}",
                 Toast.LENGTH_LONG
             ).show()
             stopSelf()
@@ -72,43 +94,4 @@ class FloatingTrackerService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 40
-            y = 200
-        }
-
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xE61E1E1E.toInt())
-            setPadding(24, 18, 24, 18)
-        }
-
-        val title = TextView(this).apply {
-            text = "Sueca (40 cartas)"
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 14f
-        }
-
-        container.addView(title)
-        floatingView = container
-        wm.addView(container, params)
-    }
-
-    override fun onDestroy() {
-        try {
-            floatingView?.let { view ->
-                windowManager?.removeViewImmediate(view)
-            }
-        } catch (_: Throwable) {
-        }
-        floatingView = null
-        super.onDestroy()
-    }
-}
+        val layoutParams = WindowManager
